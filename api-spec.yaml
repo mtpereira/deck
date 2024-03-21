@@ -1,0 +1,121 @@
+openapi: 3.0.0
+info:
+  title: Deck
+  description: API to simulate a deck of cards
+  version: 1.0.0
+paths:
+  /v1/decks/:
+    post:
+      summary: Create a new deck
+      description: Returns a new deck
+      parameters:
+        - in: query
+          name: shuffled
+          description: Returns a shuffled deck if true, false by default
+          required: false
+          schema:
+            type: boolean
+      requestBody:
+        description: Returns a deck with the listed cards only, returns a full deck if unspecified
+        required: false
+        content:
+          applicaton/json:
+            schema:
+              $ref: '#/components/schemas/cards'
+      responses:
+        '200':
+          description: A new deck
+          content:
+            applicaton/json:
+              schema:
+                $ref: '#/components/schemas/deck'
+  /v1/decks/{deck_id}:
+    get:
+      summary: Get an existing deck
+      description: Returns an existing deck
+      parameters:
+        - in: path
+          name: deck_id
+          description: UUID of an existing deck
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: An existing deck
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/deck'
+  /v1/decks/{deck_id}/cards/{count}:
+    post:
+      summary: Draw cards from a deck
+      description: Returns the drawn cards from a deck
+      parameters:
+        - in: path
+          name: deck_id
+          description: UUID of an existing deck
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: count
+          description: Number of cards to draw from a deck
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 52
+      responses:
+        '200':
+          description: Drawn cards
+          content:
+            applicaton/json:
+              schema:
+                $ref: '#/components/schemas/cards'
+components:
+  schemas:
+    card:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          format: '^([A,K,Q,J]|[2-9]|10){1}[C,D,H,S]{1}$'
+        value:
+          type: string
+          format: '^(ACE|KING|QUEEN|JACK|[2-9]|10){1}$'
+        suit:
+          type: string
+          enum: [CLUBS, DIAMONS, HEARTS, SPADES]
+    cards:
+      type: array
+      nullable: true
+      minItems: 0
+      maxItems: 52
+      uniqueItems: true
+      items:
+        $ref: '#/components/schemas/card'
+    deck:
+      type: object
+      required:
+        - deck_id
+        - shuffled
+        - remaining
+        - cards
+      properties:
+        deck_id:
+          type: string
+          format: uuid
+        shuffled:
+          type: boolean
+        remaining:
+          type: integer
+          minimum: 0
+          maximum: 52
+        cards:
+          $ref: '#/components/schemas/cards'
+
