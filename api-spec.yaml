@@ -31,7 +31,7 @@ paths:
                 $ref: '#/components/schemas/deck'
   /v1/decks/{deck_id}:
     get:
-      summary: Get an existing deck
+      summary: Open an existing deck
       description: Returns an existing deck
       parameters:
         - in: path
@@ -105,7 +105,6 @@ components:
         - deck_id
         - shuffled
         - remaining
-        - cards
       properties:
         deck_id:
           type: string
