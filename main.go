@@ -50,7 +50,7 @@ func run(ctx context.Context, log *slog.Logger) error {
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
 	mux := http.NewServeMux()
-	buildRoutes(mux)
+	addRoutes(mux, log)
 
 	api := http.Server{
 		Handler:  mux,
@@ -84,8 +84,19 @@ func run(ctx context.Context, log *slog.Logger) error {
 	return nil
 }
 
-func buildRoutes(mux *http.ServeMux) {
-	mux.Handle("POST /v1/decks/", handlePostDeck())
+func newLoggerMiddleware(log *slog.Logger) func(h http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Info("api", "request", "started handling", "path", r.URL.Path)
+			h.ServeHTTP(w, r)
+			log.Info("api", "request", "finished handling", "path", r.URL.Path)
+		})
+	}
+}
+
+func addRoutes(mux *http.ServeMux, log *slog.Logger) {
+	logRequests := newLoggerMiddleware(log)
+	mux.Handle("POST /v1/decks/", logRequests(handlePostDeck()))
 }
 
 func handlePostDeck() http.Handler {
