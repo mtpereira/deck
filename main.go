@@ -13,6 +13,7 @@ import (
 
 	"github.com/ardanlabs/conf/v3"
 
+	"github.com/mtpereira/deck/deck"
 	"github.com/mtpereira/deck/web"
 )
 
@@ -49,7 +50,8 @@ func run(ctx context.Context, log *slog.Logger) error {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
-	mux := web.NewMux(log)
+	ds := deck.NewStore(log)
+	mux := web.NewMux(log, ds)
 
 	api := http.Server{
 		Handler:  mux,

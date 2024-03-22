@@ -11,9 +11,9 @@ import (
 	"github.com/mtpereira/deck/deck"
 )
 
-func NewMux(log *slog.Logger) *http.ServeMux {
+func NewMux(log *slog.Logger, ds *deck.DeckStore) *http.ServeMux {
 	mux := http.NewServeMux()
-	addRoutes(mux, log)
+	addRoutes(mux, log, ds)
 	return mux
 }
 
@@ -27,7 +27,7 @@ func newLoggerMiddleware(log *slog.Logger) func(h http.Handler) http.Handler {
 	}
 }
 
-func handlePostDeck() http.Handler {
+func handlePostDeck(ds *deck.DeckStore) http.Handler {
 	type deckResponse struct {
 		DeckID    uuid.UUID `json:"deck_id"`
 		Shuffled  bool      `json:"shuffled"`
@@ -42,12 +42,36 @@ func handlePostDeck() http.Handler {
 			encodeJSON(w, http.StatusBadRequest, respondError(http.StatusBadRequest, "Invalid shuffled parameter"))
 			return
 		}
+
 		d := deck.New(shuffled)
+		ds.Create(d)
 		encodeJSON(w, http.StatusOK, deckResponse{
 			DeckID:    d.DeckID,
 			Shuffled:  d.Shuffled,
 			Remaining: d.Remaining,
 		})
+	})
+}
+
+func handleGetDeck(ds *deck.DeckStore) http.Handler {
+	type deckResponse struct {
+		DeckID    uuid.UUID   `json:"deck_id"`
+		Shuffled  bool        `json:"shuffled"`
+		Remaining int         `json:"remaining"`
+		Cards     []deck.Card `json:"cards"`
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		deckIDParam := r.PathValue("deck_id")
+		deckID, err := uuid.Parse(deckIDParam)
+		if err != nil {
+			encodeJSON(w, http.StatusBadRequest, respondError(http.StatusBadRequest, "Invalid deck ID"))
+		}
+
+		d, err := ds.QueryById(deckID)
+		if err != nil {
+			encodeJSON(w, http.StatusNotFound, respondError(http.StatusNotFound, "Deck not found"))
+		}
+		encodeJSON(w, http.StatusOK, deckResponse(d))
 	})
 }
 
