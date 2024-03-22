@@ -14,6 +14,8 @@ import (
 
 	"github.com/ardanlabs/conf/v3"
 	"github.com/google/uuid"
+
+	"github.com/mtpereira/deck/deck"
 )
 
 func main() {
@@ -100,30 +102,45 @@ func addRoutes(mux *http.ServeMux, log *slog.Logger) {
 }
 
 func handlePostDeck() http.Handler {
+	type deckResponse struct {
+		DeckID    uuid.UUID `json:"deck_id"`
+		Shuffled  bool      `json:"shuffled"`
+		Remaining int       `json:"remaining"`
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		encodeJSON(w, http.StatusOK, createDeck())
+		shuffledParam := r.URL.Query().Get("shuffled")
+		shuffled := false
+		err := getParam(&shuffled, shuffledParam, "true", "false")
+		if err != nil {
+			encodeJSON(w, http.StatusBadRequest, respondError(http.StatusBadRequest, "Invalid shuffled parameter"))
+			return
+		}
+		d := deck.New(shuffled)
+		encodeJSON(w, http.StatusOK, deckResponse{
+			DeckID:    d.DeckID,
+			Shuffled:  d.Shuffled,
+			Remaining: d.Remaining,
+		})
 	})
 }
 
-func createDeck() deck {
-	return deck{
-		DeckID:    uuid.New(),
-		Shuffled:  true,
-		Remaining: 52,
+func getParam(param any, paramString string, validValues ...string) error {
+	if paramString == "" {
+		return nil
 	}
-}
 
-type deck struct {
-	DeckID    uuid.UUID `json:"deck_id"`
-	Shuffled  bool      `json:"shuffled"`
-	Remaining int       `json:"remaining"`
-	Cards     []card    `json:"cards,omitempty"`
-}
+	for _, value := range validValues {
+		if value == paramString {
+			n, err := fmt.Sscanf(paramString, "%v", param)
+			if n != 1 || err != nil {
+				return err
+			}
+			return nil
+		}
+	}
 
-type card struct {
-	Code  string `json:"code"`
-	Value string `json:"value,omitempty"`
-	Suit  string `json:"suit,omitempty"`
+	return errors.New("Couldn't parse query parameter")
 }
 
 func encodeJSON[T any](w http.ResponseWriter, status int, v T) error {
@@ -134,4 +151,16 @@ func encodeJSON[T any](w http.ResponseWriter, status int, v T) error {
 		return fmt.Errorf("encode json: %w", err)
 	}
 	return nil
+}
+
+func respondError(errorCode int, message string) errorResponse {
+	return errorResponse{
+		Code:    errorCode,
+		Message: message,
+	}
+}
+
+type errorResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }

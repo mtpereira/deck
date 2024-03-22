@@ -29,6 +29,12 @@ paths:
             applicaton/json:
               schema:
                 $ref: '#/components/schemas/deck'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorInvalidParameters'
   /v1/decks/{deck_id}:
     get:
       summary: Open an existing deck
@@ -77,6 +83,16 @@ paths:
                 $ref: '#/components/schemas/cards'
 components:
   schemas:
+    errorInvalidParameters:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
     card:
       type: object
       required:
