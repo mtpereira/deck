@@ -65,11 +65,13 @@ func handleGetDeck(ds *deck.DeckStore) http.Handler {
 		deckID, err := uuid.Parse(deckIDParam)
 		if err != nil {
 			encodeJSON(w, http.StatusBadRequest, respondError(http.StatusBadRequest, "Invalid deck ID"))
+			return
 		}
 
 		d, err := ds.QueryById(deckID)
 		if err != nil {
 			encodeJSON(w, http.StatusNotFound, respondError(http.StatusNotFound, "Deck not found"))
+			return
 		}
 		encodeJSON(w, http.StatusOK, deckResponse(d))
 	})
