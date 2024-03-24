@@ -38,3 +38,9 @@ func (ds *DeckStore) QueryById(u uuid.UUID) (Deck, error) {
 	ds.log.Info("store", "query", "finished", "deckID", u)
 	return *d, nil
 }
+
+func (ds *DeckStore) Update(u uuid.UUID, update Deck) {
+	ds.log.Info("store", "update", "started", "deckID", u)
+	ds.store[u] = &update
+	ds.log.Info("store", "update", "started", "deckID", u)
+}

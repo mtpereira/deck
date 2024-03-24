@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/mtpereira/deck/deck"
@@ -43,7 +44,7 @@ func handlePostDeck(ds *deck.DeckStore) http.Handler {
 			return
 		}
 
-		d := deck.New(shuffled)
+		d := deck.New(shuffled, nil)
 		ds.Create(d)
 		encodeJSON(w, http.StatusOK, deckResponse{
 			DeckID:    d.DeckID,
@@ -74,6 +75,51 @@ func handleGetDeck(ds *deck.DeckStore) http.Handler {
 			return
 		}
 		encodeJSON(w, http.StatusOK, deckResponse(d))
+	})
+}
+
+func handlePostDeckDraw(ds *deck.DeckStore) http.Handler {
+	type cardsResponse struct {
+		Cards []deck.Card `json:"cards"`
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		deckIDParam := r.PathValue("deck_id")
+		deckID, err := uuid.Parse(deckIDParam)
+		if err != nil {
+			encodeJSON(w, http.StatusBadRequest, respondError(http.StatusBadRequest, "Invalid deck ID"))
+			return
+		}
+
+		numberParam := r.PathValue("number")
+		cardsToDraw, err := strconv.Atoi(numberParam)
+		if err != nil {
+			encodeJSON(w, http.StatusBadRequest, respondError(http.StatusBadRequest, "Invalid number of cards to draw"))
+			return
+		}
+		if cardsToDraw < 0 || cardsToDraw > 52 {
+			encodeJSON(w, http.StatusBadRequest, respondError(http.StatusBadRequest, "Invalid number of cards to draw"))
+			return
+		}
+
+		d, err := ds.QueryById(deckID)
+		if err != nil {
+			encodeJSON(w, http.StatusNotFound, respondError(http.StatusNotFound, "Deck not found"))
+			return
+		}
+
+		cards, updatedDeck, err := d.Draw(cardsToDraw)
+		if err != nil {
+			if errors.Is(err, deck.ErrUnsufficientCards) {
+				encodeJSON(w, http.StatusBadRequest, respondError(http.StatusBadRequest, err.Error()))
+				return
+			}
+			encodeJSON(w, http.StatusInternalServerError, respondError(http.StatusInternalServerError, err.Error()))
+			return
+		}
+
+		encodeJSON(w, http.StatusOK, cardsResponse{Cards: cards})
+		ds.Update(d.DeckID, updatedDeck)
 	})
 }
 
