@@ -7,11 +7,70 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mtpereira/deck/deck"
 )
+
+func Test_handlePostDeckDraw(t *testing.T) {
+	// Test it correctly draws a card.
+	var deckID string
+	ds := deck.NewStore(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	d := deck.New(false, nil)
+	ds.Create(d)
+	deckID = d.DeckID.String()
+	cardsToDraw := 1
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("/v1/decks/%s/draw/%d", deckID, cardsToDraw), nil)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.NewServeMux()
+	handler.Handle("POST /v1/decks/{deck_id}/draw/{number}", handlePostDeckDraw(ds))
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected 200 OK, got %v", rr.Code)
+	}
+
+	expectedRemaining := d.Remaining - cardsToDraw
+	c, err := decodeCards(rr.Body)
+	if err != nil {
+		t.Errorf("Expected to get Cards, got %v, and the error %v", c, err)
+	}
+	u, err := ds.QueryById(d.DeckID)
+	if err != nil {
+		t.Errorf("Deck missing from store after update: %v", err)
+	}
+	if u.Remaining != expectedRemaining {
+		t.Errorf("Expected %d cards to remain on the deck, got %d", expectedRemaining, d.Remaining)
+	}
+	if !slices.Contains(c.Cards, deck.Card{Code: "2C"}) {
+		t.Errorf("Expected drawn card to be 2C, got %v", c)
+	}
+
+	// Test it fails to draw more cards than the ones available.
+	cardsToDraw = 52
+	req, err = http.NewRequest("POST", fmt.Sprintf("/v1/decks/%s/draw/%d", deckID, cardsToDraw), nil)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	rr = httptest.NewRecorder()
+	handler = http.NewServeMux()
+	handler.Handle("POST /v1/decks/{deck_id}/draw/{number}", handlePostDeckDraw(ds))
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 Bad Request, got %v", rr.Code)
+	}
+}
 
 func Test_handlePostDeck(t *testing.T) {
 	// Test it correctly handles the shuffled param when it is defined.
@@ -87,7 +146,7 @@ func Test_handleGetDeck(t *testing.T) {
 	// Test it returns an existing deck.
 	var deckID string
 	ds := deck.NewStore(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	d := deck.New(true)
+	d := deck.New(true, nil)
 	ds.Create(d)
 	deckID = d.DeckID.String()
 
@@ -159,4 +218,16 @@ func decodeErrorResponse(b io.Reader) (errorResponse, error) {
 		return d, fmt.Errorf("decode json: %w", err)
 	}
 	return d, nil
+}
+
+func decodeCards(b io.Reader) (cardsResponse, error) {
+	var c cardsResponse
+	if err := json.NewDecoder(b).Decode(&c); err != nil {
+		return c, fmt.Errorf("decode json: %w", err)
+	}
+	return c, nil
+}
+
+type cardsResponse struct {
+	Cards []deck.Card `json:"cards"`
 }

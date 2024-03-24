@@ -179,7 +179,7 @@ func TestNew(t *testing.T) {
 		Cards:     sortedCards,
 	}
 
-	d := New(false)
+	d := New(false, nil)
 	if d.Shuffled != sortedDeck.Shuffled {
 		t.Fatalf("Expected deck.Shuffled to be false, it is not")
 	}
@@ -188,7 +188,7 @@ func TestNew(t *testing.T) {
 	}
 
 	// Test shuffled deck creation.
-	d = New(true)
+	d = New(true, nil)
 	if d.Shuffled == sortedDeck.Shuffled {
 		t.Fatalf("Expected deck.Shuffled to be true, it is not")
 	}
