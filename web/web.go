@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mtpereira/deck/deck"
@@ -21,9 +22,10 @@ func NewMux(log *slog.Logger, da *deck.DeckAPI) *http.ServeMux {
 func newLoggerMiddleware(log *slog.Logger) func(h http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Info("api", "request", "started handling", "path", r.URL.Path)
+			start := time.Now()
+			log.Info("api", "request", r.URL.Path, "status", "started")
 			h.ServeHTTP(w, r)
-			log.Info("api", "request", "finished handling", "path", r.URL.Path)
+			log.Info("api", "request", r.URL.Path, "status", "finished", "duration", time.Since(start))
 		})
 	}
 }
