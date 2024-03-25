@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/mtpereira/deck/deck"
@@ -70,6 +71,64 @@ func Test_handlePostDeckDraw(t *testing.T) {
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400 Bad Request, got %v", rr.Code)
 	}
+
+	// Test it correctly handles concurrent draw requests.
+	e := deck.New(false, nil)
+	ds.Create(e)
+	deckID = e.DeckID.String()
+
+	cardsToDraw = 52
+	numReqs := 8
+	recs := []*httptest.ResponseRecorder{}
+	for range numReqs {
+		recs = append(recs, httptest.NewRecorder())
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(numReqs)
+	for _, rr := range recs {
+		handler = http.NewServeMux()
+		handler.Handle("POST /v1/decks/{deck_id}/draw/{number}", handlePostDeckDraw(da))
+		req, err = http.NewRequest("POST", fmt.Sprintf("/v1/decks/%s/draw/%d", deckID, cardsToDraw), nil)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		go func() {
+			handler.ServeHTTP(rr, req)
+			defer wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	codes := []int{}
+	cards := []cardsResponse{}
+	for _, rr := range recs {
+		c, err := decodeCards(rr.Body)
+		if err != nil {
+			t.Errorf("Expected to get Cards, got %v, and the error %v", c, err)
+		}
+		cards = append(cards, c)
+		codes = append(codes, rr.Code)
+	}
+	badReqsCount := 0
+	for _, c := range codes {
+		if c == 400 {
+			badReqsCount += 1
+		}
+	}
+	if badReqsCount != numReqs-1 {
+		t.Errorf("All but one requests should have 400ed, %d out of %d did", badReqsCount, numReqs-1)
+	}
+	reqsWithCardsCount := 0
+	for _, c := range cards {
+		if len(c.Cards) > 0 {
+			reqsWithCardsCount += 1
+		}
+	}
+	if reqsWithCardsCount != 1 {
+		t.Errorf("All but one requests should have cards, %d did", reqsWithCardsCount)
+	}
+
 }
 
 func Test_handlePostDeck(t *testing.T) {
@@ -87,7 +146,7 @@ func Test_handlePostDeck(t *testing.T) {
 		}
 
 		rr := httptest.NewRecorder()
-		handler := http.Handler(handlePostDeck(ds))
+		handler := http.Handler(handlePostDeck(da))
 
 		handler.ServeHTTP(rr, req)
 
@@ -108,7 +167,7 @@ func Test_handlePostDeck(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	handler := http.Handler(handlePostDeck(ds))
+	handler := http.Handler(handlePostDeck(da))
 
 	handler.ServeHTTP(rr, req)
 
@@ -128,7 +187,7 @@ func Test_handlePostDeck(t *testing.T) {
 	}
 
 	rr = httptest.NewRecorder()
-	handler = http.Handler(handlePostDeck(ds))
+	handler = http.Handler(handlePostDeck(da))
 
 	handler.ServeHTTP(rr, req)
 
@@ -145,9 +204,8 @@ func Test_handlePostDeck(t *testing.T) {
 func Test_handleGetDeck(t *testing.T) {
 	// Test it returns an existing deck.
 	var deckID string
-	ds := deck.NewStore(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	d := deck.New(true, nil)
-	ds.Create(d)
+	da := deck.NewAPI(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	d := da.New(true, nil)
 	deckID = d.DeckID.String()
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("/v1/decks/%s", deckID), nil)
@@ -157,7 +215,7 @@ func Test_handleGetDeck(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	handler := http.NewServeMux()
-	handler.Handle("GET /v1/decks/{deck_id}", handleGetDeck(ds))
+	handler.Handle("GET /v1/decks/{deck_id}", handleGetDeck(da))
 
 	handler.ServeHTTP(rr, req)
 
@@ -183,7 +241,7 @@ func Test_handleGetDeck(t *testing.T) {
 
 	rr = httptest.NewRecorder()
 	handler = http.NewServeMux()
-	handler.Handle("GET /v1/decks/{deck_id}", handleGetDeck(ds))
+	handler.Handle("GET /v1/decks/{deck_id}", handleGetDeck(da))
 
 	handler.ServeHTTP(rr, req)
 
@@ -201,7 +259,6 @@ func Test_handleGetDeck(t *testing.T) {
 	if strings.Contains(rr.Body.String(), "deck_id") {
 		t.Errorf("Error response should not have a deck, got %v", rr.Body.String())
 	}
-
 }
 
 func decodeDeck(b io.Reader) (deck.Deck, error) {

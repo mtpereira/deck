@@ -70,7 +70,7 @@ func run(ctx context.Context, log *slog.Logger) error {
 		return fmt.Errorf("server error: %w", err)
 	case sig := <-shutdown:
 		log.Info("shutdown", "status", "initiated", "signal", sig)
-		log.Info("shutdown", "status", "complete")
+		defer log.Info("shutdown", "status", "complete")
 
 		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
