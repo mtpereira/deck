@@ -50,8 +50,8 @@ func run(ctx context.Context, log *slog.Logger) error {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
-	ds := deck.NewStore(log)
-	mux := web.NewMux(log, ds)
+	da := deck.NewAPI(log)
+	mux := web.NewMux(log, da)
 
 	api := http.Server{
 		Handler:  mux,

@@ -18,9 +18,8 @@ import (
 func Test_handlePostDeckDraw(t *testing.T) {
 	// Test it correctly draws a card.
 	var deckID string
-	ds := deck.NewStore(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	d := deck.New(false, nil)
-	ds.Create(d)
+	da := deck.NewAPI(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	d := da.New(false, nil)
 	deckID = d.DeckID.String()
 	cardsToDraw := 1
 
@@ -31,7 +30,7 @@ func Test_handlePostDeckDraw(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	handler := http.NewServeMux()
-	handler.Handle("POST /v1/decks/{deck_id}/draw/{number}", handlePostDeckDraw(ds))
+	handler.Handle("POST /v1/decks/{deck_id}/draw/{number}", handlePostDeckDraw(da))
 
 	handler.ServeHTTP(rr, req)
 
@@ -44,7 +43,7 @@ func Test_handlePostDeckDraw(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected to get Cards, got %v, and the error %v", c, err)
 	}
-	u, err := ds.QueryById(d.DeckID)
+	u, err := da.Get(d.DeckID)
 	if err != nil {
 		t.Errorf("Deck missing from store after update: %v", err)
 	}
@@ -64,7 +63,7 @@ func Test_handlePostDeckDraw(t *testing.T) {
 
 	rr = httptest.NewRecorder()
 	handler = http.NewServeMux()
-	handler.Handle("POST /v1/decks/{deck_id}/draw/{number}", handlePostDeckDraw(ds))
+	handler.Handle("POST /v1/decks/{deck_id}/draw/{number}", handlePostDeckDraw(da))
 
 	handler.ServeHTTP(rr, req)
 
@@ -73,8 +72,7 @@ func Test_handlePostDeckDraw(t *testing.T) {
 	}
 
 	// Test it correctly handles concurrent draw requests.
-	e := deck.New(false, nil)
-	ds.Create(e)
+	e := da.New(false, nil)
 	deckID = e.DeckID.String()
 
 	cardsToDraw = 52
@@ -138,7 +136,7 @@ func Test_handlePostDeck(t *testing.T) {
 		"true",
 		"false",
 	}
-	ds := deck.NewStore(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	da := deck.NewAPI(slog.New(slog.NewTextHandler(io.Discard, nil)))
 	for _, shuffledParam := range shuffledParamValues {
 		req, err := http.NewRequest("POST", fmt.Sprintf("/v1/decks?shuffled=%s", shuffledParam), nil)
 		if err != nil {

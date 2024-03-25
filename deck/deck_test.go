@@ -1,12 +1,16 @@
 package deck
 
 import (
+	"io"
+	"log/slog"
 	"reflect"
 	"testing"
 )
 
 func TestNew(t *testing.T) {
 	// Test sorted deck creation.
+	da := NewAPI(slog.New(slog.NewTextHandler(io.Discard, nil)))
+
 	sortedCards := []Card{
 		// Clubs
 		{
@@ -179,7 +183,7 @@ func TestNew(t *testing.T) {
 		Cards:     sortedCards,
 	}
 
-	d := New(false, nil)
+	d := da.New(false, nil)
 	if d.Shuffled != sortedDeck.Shuffled {
 		t.Fatalf("Expected deck.Shuffled to be false, it is not")
 	}
@@ -188,7 +192,7 @@ func TestNew(t *testing.T) {
 	}
 
 	// Test shuffled deck creation.
-	d = New(true, nil)
+	d = da.New(true, nil)
 	if d.Shuffled == sortedDeck.Shuffled {
 		t.Fatalf("Expected deck.Shuffled to be true, it is not")
 	}
