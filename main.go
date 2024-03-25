@@ -50,8 +50,8 @@ func run(ctx context.Context, log *slog.Logger) error {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
-	ds := deck.NewStore(log)
-	mux := web.NewMux(log, ds)
+	da := deck.NewAPI(log)
+	mux := web.NewMux(log, da)
 
 	api := http.Server{
 		Handler:  mux,
@@ -70,7 +70,7 @@ func run(ctx context.Context, log *slog.Logger) error {
 		return fmt.Errorf("server error: %w", err)
 	case sig := <-shutdown:
 		log.Info("shutdown", "status", "initiated", "signal", sig)
-		log.Info("shutdown", "status", "complete")
+		defer log.Info("shutdown", "status", "complete")
 
 		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()

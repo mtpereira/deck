@@ -12,9 +12,9 @@ import (
 	"github.com/mtpereira/deck/deck"
 )
 
-func NewMux(log *slog.Logger, ds *deck.DeckStore) *http.ServeMux {
+func NewMux(log *slog.Logger, da *deck.DeckAPI) *http.ServeMux {
 	mux := http.NewServeMux()
-	addRoutes(mux, log, ds)
+	addRoutes(mux, log, da)
 	return mux
 }
 
@@ -28,7 +28,7 @@ func newLoggerMiddleware(log *slog.Logger) func(h http.Handler) http.Handler {
 	}
 }
 
-func handlePostDeck(ds *deck.DeckStore) http.Handler {
+func handlePostDeck(da *deck.DeckAPI) http.Handler {
 	type deckResponse struct {
 		DeckID    uuid.UUID `json:"deck_id"`
 		Shuffled  bool      `json:"shuffled"`
@@ -44,8 +44,7 @@ func handlePostDeck(ds *deck.DeckStore) http.Handler {
 			return
 		}
 
-		d := deck.New(shuffled, nil)
-		ds.Create(d)
+		d := da.New(shuffled, nil)
 		encodeJSON(w, http.StatusOK, deckResponse{
 			DeckID:    d.DeckID,
 			Shuffled:  d.Shuffled,
@@ -54,7 +53,7 @@ func handlePostDeck(ds *deck.DeckStore) http.Handler {
 	})
 }
 
-func handleGetDeck(ds *deck.DeckStore) http.Handler {
+func handleGetDeck(da *deck.DeckAPI) http.Handler {
 	type deckResponse struct {
 		DeckID    uuid.UUID   `json:"deck_id"`
 		Shuffled  bool        `json:"shuffled"`
@@ -69,16 +68,16 @@ func handleGetDeck(ds *deck.DeckStore) http.Handler {
 			return
 		}
 
-		d, err := ds.QueryById(deckID)
+		d, err := da.Get(deckID)
 		if err != nil {
-			encodeJSON(w, http.StatusNotFound, respondError(http.StatusNotFound, "Deck not found"))
+			encodeJSON(w, http.StatusNotFound, respondError(http.StatusNotFound, err.Error()))
 			return
 		}
-		encodeJSON(w, http.StatusOK, deckResponse(d))
+		encodeJSON(w, http.StatusOK, deckResponse(*d))
 	})
 }
 
-func handlePostDeckDraw(ds *deck.DeckStore) http.Handler {
+func handlePostDeckDraw(da *deck.DeckAPI) http.Handler {
 	type cardsResponse struct {
 		Cards []deck.Card `json:"cards"`
 	}
@@ -102,13 +101,7 @@ func handlePostDeckDraw(ds *deck.DeckStore) http.Handler {
 			return
 		}
 
-		d, err := ds.QueryById(deckID)
-		if err != nil {
-			encodeJSON(w, http.StatusNotFound, respondError(http.StatusNotFound, "Deck not found"))
-			return
-		}
-
-		cards, updatedDeck, err := d.Draw(cardsToDraw)
+		cards, err := da.Draw(deckID, cardsToDraw)
 		if err != nil {
 			if errors.Is(err, deck.ErrUnsufficientCards) {
 				encodeJSON(w, http.StatusBadRequest, respondError(http.StatusBadRequest, err.Error()))
@@ -119,7 +112,6 @@ func handlePostDeckDraw(ds *deck.DeckStore) http.Handler {
 		}
 
 		encodeJSON(w, http.StatusOK, cardsResponse{Cards: cards})
-		ds.Update(d.DeckID, updatedDeck)
 	})
 }
 
