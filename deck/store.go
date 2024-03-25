@@ -1,7 +1,6 @@
 package deck
 
 import (
-	"errors"
 	"log/slog"
 	"sync"
 
@@ -39,7 +38,7 @@ func (ds *DeckStore) QueryById(u uuid.UUID) (Deck, error) {
 	d := ds.store[u]
 	if d == nil {
 		ds.log.Info("store", "query", "not found", "deckID", u)
-		return Deck{}, errors.New("Deck not found")
+		return Deck{}, ErrDeckNotFound
 	}
 	ds.log.Info("store", "query", "finished", "deckID", u)
 	return *d, nil
