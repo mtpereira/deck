@@ -19,13 +19,26 @@ func NewMux(log *slog.Logger, da *deck.DeckAPI) *http.ServeMux {
 	return mux
 }
 
+type wrappedWriter struct {
+	responseWriter http.ResponseWriter
+	statusCode     int
+}
+
+func (w *wrappedWriter) WriteHeader(statusCode int) {
+	w.responseWriter.WriteHeader(statusCode)
+	w.statusCode = statusCode
+}
+
 func newLoggerMiddleware(log *slog.Logger) func(h http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			log.Info("api", "request", r.URL.Path, "status", "started")
-			h.ServeHTTP(w, r)
-			log.Info("api", "request", r.URL.Path, "status", "finished", "duration", time.Since(start))
+			wr := wrappedWriter{
+				responseWriter: w,
+				statusCode:     http.StatusOK,
+			}
+			h.ServeHTTP(wr.responseWriter, r)
+			log.Info("api", "request", r.URL.Path, "status", wr.statusCode, "duration", time.Since(start))
 		})
 	}
 }
